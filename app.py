@@ -1,13 +1,12 @@
-import streamlit as datetime
+import streamlit as st
 import pandas as pd
 import numpy as np
 import yfinance as yf
 import plotly.graph_objects as go
-import streamlit as st
 
 # Configuración de la página (Debe ser el primer comando de Streamlit)
 st.set_page_config(
-    page_title="Terminal Analítica Quotex",
+    page_title="Terminal Analítica Quotex OTC",
     page_icon="📈",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -38,14 +37,44 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
+# Lista completa de activos OTC populares en plataformas de opciones binarias simulados mediante tickers equivalentes/cercanos en Yahoo Finance
+activos_otc = {
+    "EUR/USD (OTC)": "EURUSD=X",
+    "GBP/USD (OTC)": "GBPUSD=X",
+    "USD/JPY (OTC)": "USDJPY=X",
+    "AUD/USD (OTC)": "AUDUSD=X",
+    "EUR/JPY (OTC)": "EURJPY=X",
+    "GBP/JPY (OTC)": "GBPJPY=X",
+    "USD/CAD (OTC)": "USDCAD=X",
+    "AUD/CAD (OTC)": "AUDCAD=X",
+    "EUR/GBP (OTC)": "EURGBP=X",
+    "NZD/USD (OTC)": "NZDUSD=X",
+    "USD/CHF (OTC)": "USDCHF=X",
+    "EUR/AUD (OTC)": "EURAUD=X",
+    "EUR/NZD (OTC)": "EURNZD=X",
+    "GBP/AUD (OTC)": "GBPAUD=X",
+    "AUD/JPY (OTC)": "AUDJPY=X",
+    "CAD/JPY (OTC)": "CADJPY=X",
+    "CHF/JPY (OTC)": "CHFJPY=X",
+    "EUR/CAD (OTC)": "EURCAD=X",
+    "GBP/CAD (OTC)": "GBPCAD=X",
+    "USD/NOK (OTC)": "USDNOK=X",
+    "USD/SEK (OTC)": "USDSEK=X",
+    "BTC/USD (OTC Crypto)": "BTC-USD",
+    "ETH/USD (OTC Crypto)": "ETH-USD",
+    "XRP/USD (OTC Crypto)": "XRP-USD",
+    "LTC/USD (OTC Crypto)": "LTC-USD"
+}
+
 # Barra Lateral - Controles de Configuración
-st.sidebar.markdown("## ⚙️ Panel de Control")
+st.sidebar.markdown("## ⚙️ Panel de Control OTC")
 st.sidebar.markdown("---")
 
-activo_seleccionado = st.sidebar.selectbox(
-    "Seleccionar Activo (Divisa / Crypto)",
-    ["EURUSD=X", "GBPUSD=X", "USDJPY=X", "BTC-USD", "ETH-USD"]
+nombre_activo = st.sidebar.selectbox(
+    "Seleccionar Activo OTC",
+    list(activos_otc.keys())
 )
+activo_seleccionado = activos_otc[nombre_activo]
 
 temporalidad = st.sidebar.selectbox(
     "Temporalidad del Análisis",
@@ -59,13 +88,13 @@ indicador_base = st.sidebar.selectbox(
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("### 🛠️ Estado del Sistema")
-st.sidebar.success("🟢 Conexión de Datos: Activa")
+st.sidebar.success("🟢 Conexión de Datos OTC: Activa")
 
 # Título Principal
-st.title("⚡ Terminal de Análisis Cuántico - Quotex")
-st.markdown("Escáner inteligente de activos en tiempo real para la toma de decisiones rápidas.")
+st.title("⚡ Terminal de Análisis Cuántico - Quotex OTC")
+st.markdown("Escáner inteligente multinivel para pares de divisas y criptomonedas en modalidad OTC.")
 
-# Simulación / Descarga de datos reales de mercado
+# Descarga de datos de mercado
 @st.cache_data(ttl=60)
 def cargar_datos(ticker, intervalo):
     try:
@@ -79,7 +108,7 @@ def cargar_datos(ticker, intervalo):
 
 data = cargar_datos(activo_seleccionado, temporalidad)
 
-if data is not None and not data.empty:
+if data is not None and not data.empty and len(data) > 20:
     # Cálculo de Indicadores Técnicos Básicos (RSI y Medias Móviles)
     delta = data['Close'].diff()
     gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
@@ -92,13 +121,12 @@ if data is not None and not data.empty:
 
     # Últimos valores registrados
     precio_actual = float(data['Close'].iloc[-1])
-    rsi_actual = float(data['RSI'].iloc[-1])
-    sma20_actual = float(data['SMA_20'].iloc[-1])
+    rsi_actual = float(data['RSI'].iloc[-1]) if not np.isnan(data['RSI'].iloc[-1]) else 50.0
 
     # Métricas Principales en Pantalla
     col1, col2, col3, col4 = st.columns(4)
     with col1:
-        st.metric(label="Activo Analizado", value=activo_seleccionado)
+        st.metric(label="Activo Seleccionado", value=nombre_activo)
     with col2:
         st.metric(label="Precio Actual", value=f"{precio_actual:.5f}")
     with col3:
@@ -111,13 +139,10 @@ if data is not None and not data.empty:
     st.markdown("---")
 
     # Layout de Gráfico Interactivo y Panel de Control de Acciones
-    col_grafico, col_panel = st.markdown, st.columns([3, 1])
-    
-    # Usando columnas reales de Streamlit para la interfaz
     c_graf, c_pan = st.columns([2.5, 1])
 
     with c_graf:
-        st.subheader(f"Gráfico Técnico - {activo_seleccionado}")
+        st.subheader(f"Gráfico Técnico - {nombre_activo}")
         fig = go.Figure()
         fig.add_trace(go.Candlestick(
             x=data.index,
@@ -152,9 +177,9 @@ if data is not None and not data.empty:
 
         st.markdown("---")
         
-        # Botones de control de interfaz seguros (No borran el estado del escáner)
+        # Botón de control de interfaz seguro (Mantiene la sesión y los datos)
         if st.button("🔄 Actualizar Escáner"):
             st.rerun()
 
 else:
-    st.error("No se pudieron cargar los datos de mercado en este momento. Intenta cambiar de activo.")
+    st.error("No se pudieron cargar suficientes datos para este activo en la temporalidad seleccionada. Prueba cambiando la temporalidad o el activo.")
