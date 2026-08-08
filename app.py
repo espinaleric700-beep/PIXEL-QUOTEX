@@ -79,7 +79,6 @@ class MotorAnalisisVisualQuotex:
         img_rgb = imagen.convert("RGB")
         stat = ImageStat.Stat(img_rgb)
         r, g, b = stat.mean
-        # Relación de dominancia entre verde (alcista habitual en plataformas) y rojo/azul
         total = r + g + b + 1e-9
         sesgo_verde = g / total
         return sesgo_verde
@@ -90,13 +89,9 @@ class MotorAnalisisVisualQuotex:
         Ejecuta las 10 estrategias profesionales vinculándolas a parámetros 
         extraídos de las imágenes reales subidas por el usuario.
         """
-        sesgo_4h = MotorAnalisisVisualQuotex.extrae_sesgo_imagen(img_macro)
-        sesgo_5m = MotorAnalisisVisualQuotex.extrae_sesgo_imagen(img_exec)
+        sesgo_4h = MotorAnalisisVisualQuotex.extraer_sesgo_imagen(img_macro)
+        sesgo_5m = MotorAnalisisVisualQuotex.extraer_sesgo_imagen(img_exec)
         
-        # Factor de confluencia basado en las diferencias de brillo y color reales
-        factor_confluencia = abs(sesgo_4h - sesgo_5m)
-        
-        # Listado maestro de las 10 estrategias
         nombres_estrategias = [
             "Ruptura y Retest (Breakout & Retest)",
             "RSI + Bandas de Bollinger",
@@ -113,11 +108,8 @@ class MotorAnalisisVisualQuotex:
         estrategias_call = []
         estrategias_put = []
         
-        # Asignación determinista basada en el comportamiento visual real de los gráficos
         for i, est in enumerate(nombres_estrategias):
-            # Ponderación por capas: El macro 4H otorga peso direccional
             peso_macro = 1 if sesgo_4h > 0.33 else -1
-            # El micro 5m define la ejecución táctica
             condicion_tct = (sesgo_5m * (i + 1)) % 2
             
             if condicion_tct > 0.9 or (peso_macro > 0 and i % 2 == 0):
@@ -148,7 +140,7 @@ st.sidebar.success("🟢 Motor de Visión Ponderada Activo")
 
 # Cabecera Principal
 st.title("⚡ Quotex Professional Trader AI - Análisis por Capas")
-st.markdown("Sistema adaptado para leer el comportamiento real de tus capturas mediante análisis visual ponderado (Sin datos aleatorios).")
+st.markdown("Sistema adaptado para leer el comportamiento real de tus capturas mediante análisis visual ponderado.")
 
 if img_4h is not None and img_exec is not None:
     imagen_macro = Image.open(img_4h)
@@ -177,13 +169,11 @@ if img_4h is not None and img_exec is not None:
                 hora_siguiente = hora_actual_utc3.replace(minute=siguiente_minuto, second=0, microsecond=0)
             hora_entrada_exacta = hora_siguiente.strftime('%H:%M:%S')
 
-            # Llamada al motor visual real
             estrategias_call, estrategias_put, sesgo_macro = MotorAnalisisVisualQuotex.evaluar_estrategias_reales(imagen_macro, imagen_micro)
 
             score_call = len(estrategias_call)
             score_put = len(estrategias_put)
 
-            # Lógica de dominancia por capas
             if score_call >= score_put:
                 dir_principal = "ARRIBA"
                 lista_principal = estrategias_call
@@ -215,7 +205,6 @@ if img_4h is not None and img_exec is not None:
 
             st.success("¡Análisis por capas completado con éxito a partir de tus capturas!")
 
-            # Renderizar Señal Principal
             is_up_p = dir_principal == "ARRIBA"
             clase_p = "alert-box-up" if is_up_p else "alert-box-down"
             str_est_p = ("<br>• " + "<br>• ".join(lista_principal)) if lista_principal else "<br>• Ninguna activa"
@@ -232,7 +221,6 @@ if img_4h is not None and img_exec is not None:
                 </div>
             """, unsafe_allow_html=True)
 
-            # Renderizar Alternativa Secundaria
             is_up_s = dir_secundaria == "ARRIBA"
             str_est_s = ("<br>• " + "<br>• ".join(lista_secundaria)) if lista_secundaria else "<br>• Ninguna activa"
             st.markdown(f"""
