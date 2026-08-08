@@ -140,20 +140,19 @@ if data is not None and not data.empty and len(data) > 20:
     else:
         data.index = data.index.tz_convert(tz_utc3)
 
-     precio_base_mercado = float(data['Close'].iloc[-1])
+    precio_base_mercado = float(data['Close'].iloc[-1])
 
     # Inicializar o actualizar el precio del tick en tiempo real con micro-variación estocástica
     if st.session_state.get('active_ticker') != nombre_activo or st.session_state.last_tick_price is None:
         st.session_state.active_ticker = nombre_activo
         st.session_state.last_tick_price = precio_base_mercado
     else:
-        # Generar micro-cambio aleatorio realista estilo bróker (oscilación de pips)
         variacion = np.random.normal(0, 0.00015)
         st.session_state.last_tick_price += variacion
 
     precio_actual = st.session_state.last_tick_price
 
-    # Actualizar la última vela del DataFrame en tiempo real para que el gráfico se mueva al instante
+    # Actualizar la última vela del DataFrame en tiempo real
     data.loc[data.index[-1], 'Close'] = precio_actual
     if precio_actual > data.loc[data.index[-1], 'High']:
         data.loc[data.index[-1], 'High'] = precio_actual
@@ -207,7 +206,6 @@ if data is not None and not data.empty and len(data) > 20:
         
         fig = go.Figure()
         
-        # Estilo de Velas Idéntico a Quotex (Verde alcista #00C853, Rojo bajista #FF3D00)
         fig.add_trace(go.Candlestick(
             x=data.index,
             open=data['Open'],
@@ -221,7 +219,6 @@ if data is not None and not data.empty and len(data) > 20:
             decreasing_fillcolor='#FF3D00'
         ))
         
-        # Línea de Media Móvil elegante
         fig.add_trace(go.Scatter(
             x=data.index, 
             y=data['SMA_20'], 
@@ -230,7 +227,6 @@ if data is not None and not data.empty and len(data) > 20:
             line=dict(color='#2979FF', width=1.5)
         ))
         
-        # Diseño de fondo oscuro limpio y profesional idéntico al bróker con precios a la derecha
         fig.update_layout(
             paper_bgcolor='#0b131e',
             plot_bgcolor='#0b131e',
@@ -285,7 +281,6 @@ if data is not None and not data.empty and len(data) > 20:
 
         st.markdown("---")
         
-        # Botón para registrar la señal al historial
         if tipo_senal and st.button("📌 Registrar Señal"):
             nueva_entrada = {
                 "Hora Entrada (UTC-3)": hora_senal_siguiente,
@@ -299,7 +294,6 @@ if data is not None and not data.empty and len(data) > 20:
                 st.session_state.historial_senales.append(nueva_entrada)
                 st.success("¡Señal guardada!")
 
-    # --- SECCIÓN DE HISTORIAL Y AUDITORÍA WIN / LOSS ---
     st.markdown("---")
     st.subheader("📊 Historial de Auditoría de Señales (WIN / LOSS) - UTC-3")
     
@@ -329,3 +323,4 @@ if data is not None and not data.empty and len(data) > 20:
 
 else:
     st.error("Cargando datos del mercado en tiempo real...")
+    
