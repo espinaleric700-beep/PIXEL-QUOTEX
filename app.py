@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 import yfinance as yf
 import plotly.graph_objects as go
-from datetime import datetime, timedelta
+from datetime import datetime
 
 # Configuración de la página
 st.set_page_config(
@@ -52,7 +52,11 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Lista completa de activos OTC incluyendo USD/BRL
+# Inicializar el historial de señales en la sesión de Streamlit para que no se borre
+if 'historial_senales' not in st.session_state:
+    st.session_state.historial_senales = []
+
+# Lista completa de activos OTC
 activos_otc = {
     "USD/BRL (OTC)": "USDBRL=X",
     "EUR/USD (OTC)": "EURUSD=X",
@@ -108,7 +112,7 @@ st.sidebar.success("🟢 Conexión de Datos OTC: Activa")
 
 # Título Principal
 st.title("⚡ Terminal de Análisis Cuántico - Quotex OTC")
-st.markdown("Escáner inteligente con cálculo de hora de entrada y temporalidad para operaciones rápidas.")
+st.markdown("Escáner inteligente con registro automatizado de señales y auditoría de resultados WIN / LOSS.")
 
 # Descarga de datos de mercado
 @st.cache_data(ttl=60)
@@ -134,16 +138,14 @@ if data is not None and not data.empty and len(data) > 20:
     data['SMA_20'] = data['Close'].rolling(window=20).mean()
     data['SMA_50'] = data['Close'].rolling(window=50).mean()
 
-    # Últimos valores registrados
+    # Precios de las últimas dos velas para evaluar resultados cerrados
     precio_actual = float(data['Close'].iloc[-1])
+    precio_anterior = float(data['Close'].iloc[-2])
     rsi_actual = float(data['RSI'].iloc[-1]) if not np.isnan(data['RSI'].iloc[-1]) else 50.0
     
-    # Obtener la hora de la última vela cerrada y calcular la hora estimada de entrada
+    # Hora de la señal
     ultima_vela_tiempo = data.index[-1]
-    if isinstance(ultima_vela_tiempo, pd.Timestamp):
-        hora_senal = ultima_vela_tiempo.strftime('%H:%M:%S')
-    else:
-        hora_senal = datetime.now().strftime('%H:%M:%S')
+    hora_senal = ultima_vela_tiempo.strftime('%H:%M:%S') if isinstance(ultima_vela_tiempo, pd.Timestamp) else datetime.now().strftime('%H:%M:%S')
 
     # Métricas Principales en Pantalla
     col1, col2, col3, col4 = st.columns(4)
@@ -185,24 +187,26 @@ if data is not None and not data.empty and len(data) > 20:
 
     with c_pan:
         st.subheader("Panel de Operativa")
-        st.markdown("Detalles de la señal actual:")
         
+        tipo_senal = None
         if rsi_actual < 40:
+            tipo_senal = "ARRIBA"
             st.markdown(f"""
                 <div class="alert-box">
                     <p class="signal-up">🚀 ACCIÓN: ARRIBA</p>
                     <p><b>Temporalidad:</b> {temporalidad}</p>
                     <p><b>Hora de Entrada:</b> {hora_senal}</p>
-                    <p style="font-size: 0.85rem; color: #8b949e;">Zona de sobreventa detectada. Ideal para entrada inmediata al inicio de la vela.</p>
+                    <p style="font-size: 0.85rem; color: #8b949e;">Zona de sobreventa detectada.</p>
                 </div>
             """, unsafe_allow_html=True)
         elif rsi_actual > 60:
+            tipo_senal = "ABAJO"
             st.markdown(f"""
                 <div class="alert-box-down">
                     <p class="signal-down">🔻 ACCIÓN: ABAJO</p>
                     <p><b>Temporalidad:</b> {temporalidad}</p>
                     <p><b>Hora de Entrada:</b> {hora_senal}</p>
-                    <p style="font-size: 0.85rem; color: #8b949e;">Zona de sobrecompra detectada. Ideal para entrada inmediata al inicio de la vela.</p>
+                    <p style="font-size: 0.85rem; color: #8b949e;">Zona de sobrecompra detectada.</p>
                 </div>
             """, unsafe_allow_html=True)
         else:
@@ -211,15 +215,57 @@ if data is not None and not data.empty and len(data) > 20:
                     <p style="color: #8b949e; font-weight: bold;">⚖️ MERCADO EN CONSOLIDACIÓN</p>
                     <p><b>Temporalidad:</b> {temporalidad}</p>
                     <p><b>Última revisión:</b> {hora_senal}</p>
-                    <p style="font-size: 0.85rem; color: #8b949e;">Sin señales claras. Esperar alineación de indicadores.</p>
                 </div>
             """, unsafe_allow_html=True)
 
         st.markdown("---")
         
-        # Botón seguro que actualiza los datos al instante sin borrar estados
+        # Botón para registrar la señal activa en el historial de auditoría
+        if tipo_senal and st.button("📌 Registrar Señal en el Historial"):
+            nueva_entrada = {
+                "Hora": hora_senal,
+                "Activo": nombre_activo,
+                "Tipo": tipo_senal,
+                "Temporalidad": temporalidad,
+                "Precio_Entrada": precio_anterior,
+                "Estado": "Pendiente / Evaluando"
+            }
+            # Evitar duplicados exactos seguidos
+            if not st.session_state.historial_senales or st.session_state.historial_senales[-1]["Hora"] != hora_senal:
+                st.session_state.historial_senales.append(nueva_entrada)
+                st.success("¡Señal registrada con éxito en el historial!")
+
         if st.button("🔄 Actualizar Escáner"):
             st.rerun()
+
+    # --- SECCIÓN DE HISTORIAL Y AUDITORÍA DE RESULTADOS (WIN / LOSS) ---
+    st.markdown("---")
+    st.subheader("📊 Historial de Auditoría de Señales (WIN / LOSS)")
+    
+    if st.session_state.historial_senales:
+        # Evaluar resultados en tiempo real con la vela actual
+        for item in st.session_state.historial_senales:
+            if item["Estado"] == "Pendiente / Evaluando":
+                p_entry = item["Precio_Entrada"]
+                if item["Tipo"] == "ARRIBA":
+                    if precio_actual > p_entry:
+                        item["Estado"] = "🟢 WIN"
+                    elif precio_actual < p_entry:
+                        item["Estado"] = "🔴 LOSS"
+                elif item["Tipo"] == "ABAJO":
+                    if precio_actual < p_entry:
+                        item["Estado"] = "🟢 WIN"
+                    elif precio_actual > p_entry:
+                        item["Estado"] = "🔴 LOSS"
+
+        df_historial = pd.DataFrame(st.session_state.historial_senales)
+        st.dataframe(df_historial, use_container_width=True)
+        
+        if st.button("🗑️ Limpiar Historial"):
+            st.session_state.historial_senales = []
+            st.rerun()
+    else:
+        st.info("No hay señales registradas todavía. Haz clic en 'Registrar Señal en el Historial' cuando aparezca una oportunidad.")
 
 else:
     st.error("No se pudieron cargar suficientes datos para este activo en la temporalidad seleccionada. Prueba cambiando la temporalidad o el activo.")
