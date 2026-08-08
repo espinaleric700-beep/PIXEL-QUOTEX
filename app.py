@@ -3,8 +3,9 @@ import pandas as pd
 import numpy as np
 import yfinance as yf
 import plotly.graph_objects as go
+from datetime import datetime, timedelta
 
-# Configuración de la página (Debe ser el primer comando de Streamlit)
+# Configuración de la página
 st.set_page_config(
     page_title="Terminal Analítica Quotex OTC",
     page_icon="📈",
@@ -12,7 +13,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Estilos CSS personalizados para un look profesional, oscuro y limpio tipo terminal financiera
+# Estilos CSS profesionales
 st.markdown("""
     <style>
     .main {
@@ -34,10 +35,24 @@ st.markdown("""
         font-weight: bold;
         font-size: 1.2rem;
     }
+    .alert-box {
+        background-color: #161b22;
+        border-left: 5px solid #238636;
+        padding: 15px;
+        border-radius: 4px;
+        margin-bottom: 10px;
+    }
+    .alert-box-down {
+        background-color: #161b22;
+        border-left: 5px solid #da3633;
+        padding: 15px;
+        border-radius: 4px;
+        margin-bottom: 10px;
+    }
     </style>
 """, unsafe_allow_html=True)
 
-# Lista completa de activos OTC populares en plataformas de opciones binarias simulados mediante tickers equivalentes/cercanos en Yahoo Finance
+# Lista completa de activos OTC incluyendo USD/BRL
 activos_otc = {
     "USD/BRL (OTC)": "USDBRL=X",
     "EUR/USD (OTC)": "EURUSD=X",
@@ -93,13 +108,12 @@ st.sidebar.success("🟢 Conexión de Datos OTC: Activa")
 
 # Título Principal
 st.title("⚡ Terminal de Análisis Cuántico - Quotex OTC")
-st.markdown("Escáner inteligente multinivel para pares de divisas y criptomonedas en modalidad OTC.")
+st.markdown("Escáner inteligente con cálculo de hora de entrada y temporalidad para operaciones rápidas.")
 
 # Descarga de datos de mercado
 @st.cache_data(ttl=60)
 def cargar_datos(ticker, intervalo):
     try:
-        # Descargando datos recientes para análisis técnico rápido
         df = yf.download(ticker, period="1d", interval=intervalo, progress=False)
         if isinstance(df.columns, pd.MultiIndex):
             df.columns = df.columns.get_level_values(0)
@@ -110,7 +124,7 @@ def cargar_datos(ticker, intervalo):
 data = cargar_datos(activo_seleccionado, temporalidad)
 
 if data is not None and not data.empty and len(data) > 20:
-    # Cálculo de Indicadores Técnicos Básicos (RSI y Medias Móviles)
+    # Cálculo de Indicadores Técnicos (RSI y Medias Móviles)
     delta = data['Close'].diff()
     gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
     loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
@@ -123,6 +137,13 @@ if data is not None and not data.empty and len(data) > 20:
     # Últimos valores registrados
     precio_actual = float(data['Close'].iloc[-1])
     rsi_actual = float(data['RSI'].iloc[-1]) if not np.isnan(data['RSI'].iloc[-1]) else 50.0
+    
+    # Obtener la hora de la última vela cerrada y calcular la hora estimada de entrada
+    ultima_vela_tiempo = data.index[-1]
+    if isinstance(ultima_vela_tiempo, pd.Timestamp):
+        hora_senal = ultima_vela_tiempo.strftime('%H:%M:%S')
+    else:
+        hora_senal = datetime.now().strftime('%H:%M:%S')
 
     # Métricas Principales en Pantalla
     col1, col2, col3, col4 = st.columns(4)
@@ -133,17 +154,16 @@ if data is not None and not data.empty and len(data) > 20:
     with col3:
         st.metric(label="RSI (14)", value=f"{rsi_actual:.2f}")
     with col4:
-        # Lógica de Sugerencia Automática con terminología personalizada
         sugerencia = "ARRIBA 🟢" if rsi_actual < 45 else ("ABAJO 🔴" if rsi_actual > 55 else "NEUTRAL ⚪")
         st.metric(label="Señal Sugerida", value=sugerencia)
 
     st.markdown("---")
 
-    # Layout de Gráfico Interactivo y Panel de Control de Acciones
+    # Layout de Gráfico Interactivo y Panel de Operativa
     c_graf, c_pan = st.columns([2.5, 1])
 
     with c_graf:
-        st.subheader(f"Gráfico Técnico - {nombre_activo}")
+        st.subheader(f"Gráfico Técnico - {nombre_activo} ({temporalidad})")
         fig = go.Figure()
         fig.add_trace(go.Candlestick(
             x=data.index,
@@ -165,20 +185,39 @@ if data is not None and not data.empty and len(data) > 20:
 
     with c_pan:
         st.subheader("Panel de Operativa")
-        st.markdown("Basado en el análisis algorítmico actual:")
+        st.markdown("Detalles de la señal actual:")
         
         if rsi_actual < 40:
-            st.markdown('<p class="signal-up">🚀 Oportunidad: ARRIBA</p>', unsafe_allow_html=True)
-            st.info("El activo se encuentra en zona de sobreventa técnica.")
+            st.markdown(f"""
+                <div class="alert-box">
+                    <p class="signal-up">🚀 ACCIÓN: ARRIBA</p>
+                    <p><b>Temporalidad:</b> {temporalidad}</p>
+                    <p><b>Hora de Entrada:</b> {hora_senal}</p>
+                    <p style="font-size: 0.85rem; color: #8b949e;">Zona de sobreventa detectada. Ideal para entrada inmediata al inicio de la vela.</p>
+                </div>
+            """, unsafe_allow_html=True)
         elif rsi_actual > 60:
-            st.markdown('<p class="signal-down">🔻 Oportunidad: ABAJO</p>', unsafe_allow_html=True)
-            st.warning("El activo se encuentra en zona de sobrecompra técnica.")
+            st.markdown(f"""
+                <div class="alert-box-down">
+                    <p class="signal-down">🔻 ACCIÓN: ABAJO</p>
+                    <p><b>Temporalidad:</b> {temporalidad}</p>
+                    <p><b>Hora de Entrada:</b> {hora_senal}</p>
+                    <p style="font-size: 0.85rem; color: #8b949e;">Zona de sobrecompra detectada. Ideal para entrada inmediata al inicio de la vela.</p>
+                </div>
+            """, unsafe_allow_html=True)
         else:
-            st.markdown('<p style="color: #8b949e;">⚖️ Mercado en Consolidación. Esperar confirmación.</p>', unsafe_allow_html=True)
+            st.markdown(f"""
+                <div style="background-color: #161b22; padding: 15px; border-radius: 4px; border: 1px solid #30363d;">
+                    <p style="color: #8b949e; font-weight: bold;">⚖️ MERCADO EN CONSOLIDACIÓN</p>
+                    <p><b>Temporalidad:</b> {temporalidad}</p>
+                    <p><b>Última revisión:</b> {hora_senal}</p>
+                    <p style="font-size: 0.85rem; color: #8b949e;">Sin señales claras. Esperar alineación de indicadores.</p>
+                </div>
+            """, unsafe_allow_html=True)
 
         st.markdown("---")
         
-        # Botón de control de interfaz seguro que actualiza sin perder la sesión
+        # Botón seguro que actualiza los datos al instante sin borrar estados
         if st.button("🔄 Actualizar Escáner"):
             st.rerun()
 
