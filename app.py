@@ -15,7 +15,7 @@ st.set_page_config(
 )
 
 # Configurar Zona Horaria UTC-3
-tz_utc3 = pytz.timezone('Etc/GMT+3')  # Nota: En pytz/Etc, +3 equivale a UTC-3
+tz_utc3 = pytz.timezone('Etc/GMT+3')
 
 # Estilos CSS profesionales
 st.markdown("""
@@ -110,6 +110,11 @@ indicador_base = st.sidebar.selectbox(
     ["RSI + Medias Móviles", "Bandas de Bollinger", "Cruce MACD"]
 )
 
+# Control deslizante para calibrar el precio manualmente contra Quotex
+st.sidebar.markdown("---")
+st.sidebar.markdown("### 🎛️ Calibración de Precio")
+correccion_pip = st.sidebar.slider("Ajuste manual de Pips", -0.0100, 0.0100, 0.0000, 0.0001, format="%.4f")
+
 st.sidebar.markdown("---")
 st.sidebar.markdown("### 🛠️ Estado del Sistema")
 st.sidebar.success("🟢 Conexión de Datos OTC: Activa")
@@ -117,7 +122,7 @@ st.sidebar.info("🕒 Zona Horaria: UTC-3")
 
 # Título Principal
 st.title("⚡ Terminal de Análisis Cuántico - Quotex OTC")
-st.markdown("Escáner inteligente con registro automatizado de señales en formato UTC-3 y auditoría WIN / LOSS.")
+st.markdown("Escáner inteligente con calibración manual de precios, registro UTC-3 y auditoría WIN / LOSS.")
 
 # Descarga de datos de mercado
 @st.cache_data(ttl=60)
@@ -149,9 +154,9 @@ if data is not None and not data.empty and len(data) > 20:
     data['SMA_20'] = data['Close'].rolling(window=20).mean()
     data['SMA_50'] = data['Close'].rolling(window=50).mean()
 
-    # Precios de las últimas dos velas
-    precio_actual = float(data['Close'].iloc[-1])
-    precio_anterior = float(data['Close'].iloc[-2])
+    # Precios con la corrección manual aplicada para igualar a Quotex
+    precio_actual = float(data['Close'].iloc[-1]) + correccion_pip
+    precio_anterior = float(data['Close'].iloc[-2]) + correccion_pip
     rsi_actual = float(data['RSI'].iloc[-1]) if not np.isnan(data['RSI'].iloc[-1]) else 50.0
     
     # Hora exacta ajustada a UTC-3
@@ -163,7 +168,7 @@ if data is not None and not data.empty and len(data) > 20:
     with col1:
         st.metric(label="Activo Seleccionado", value=nombre_activo)
     with col2:
-        st.metric(label="Precio Actual", value=f"{precio_actual:.5f}")
+        st.metric(label="Precio Calibrado", value=f"{precio_actual:.5f}")
     with col3:
         st.metric(label="RSI (14)", value=f"{rsi_actual:.2f}")
     with col4:
@@ -180,13 +185,13 @@ if data is not None and not data.empty and len(data) > 20:
         fig = go.Figure()
         fig.add_trace(go.Candlestick(
             x=data.index,
-            open=data['Open'],
-            high=data['High'],
-            low=data['Low'],
-            close=data['Close'],
+            open=data['Open'] + correccion_pip,
+            high=data['High'] + correccion_pip,
+            low=data['Low'] + correccion_pip,
+            close=data['Close'] + correccion_pip,
             name='Precio'
         ))
-        fig.add_trace(go.Scatter(x=data.index, y=data['SMA_20'], mode='lines', name='SMA 20', line=dict(color='orange', width=1.5)))
+        fig.add_trace(go.Scatter(x=data.index, y=data['SMA_20'] + correccion_pip, mode='lines', name='SMA 20', line=dict(color='orange', width=1.5)))
         
         fig.update_layout(
             template='plotly_dark',
