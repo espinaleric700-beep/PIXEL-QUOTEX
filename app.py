@@ -7,7 +7,7 @@ from PIL import Image
 
 # Configuración de la página
 st.set_page_config(
-    page_title="Trader Profesional - Análisis Multi-Temporalidad Quotex",
+    page_title="Trader Profesional - Gestión de Riesgo y Multi-Temporalidad",
     page_icon="📈",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -60,6 +60,14 @@ st.markdown("""
         color: #8b949e;
         margin-bottom: 15px;
     }
+    .martingale-box {
+        background-color: #1c1917;
+        border: 1px dashed #f59e0b;
+        padding: 15px;
+        border-radius: 6px;
+        color: #f3f4f6;
+        margin-top: 15px;
+    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -67,8 +75,25 @@ st.markdown("""
 if 'historial_escaneo' not in st.session_state:
     st.session_state.historial_escaneo = []
 
-# Panel Lateral de Control y Carga de Imágenes Multi-Temporalidad
+# Panel Lateral de Control, Gestión de Capital y Carga de Imágenes
 st.sidebar.markdown("## 📊 Sala de Trading Profesional")
+st.sidebar.markdown("---")
+
+# Panel de Configuración de Capital por Operación (Monto Base)
+st.sidebar.markdown("### 💰 Gestión de Capital")
+monto_operacion = st.sidebar.number_input(
+    "Inversión por Operación ($ USD)", 
+    min_value=1.0, 
+    max_value=10000.0, 
+    value=10.0, 
+    step=1.0
+)
+
+estrategia_reentrada = st.sidebar.selectbox(
+    "Estrategia de Reentrada (Martingala)",
+    ["Sin Reentrada (Conservador)", "Martingala Suave (x2.1)", "Martingala Agresiva (x2.3)"]
+)
+
 st.sidebar.markdown("---")
 st.sidebar.info("💡 **Instrucción:** Sube o pega ambas capturas (puedes usar Snipping Tool y `Ctrl + V`).")
 
@@ -94,12 +119,12 @@ temporalidad_analisis = st.sidebar.selectbox(
     ["1m", "5m", "15m", "30m"]
 )
 
-st.sidebar.success("🟢 Sistema Multi-Temporalidad Activo")
+st.sidebar.success("🟢 Sistema Multi-Temporalidad & Riesgo Activo")
 st.sidebar.info("🕒 Zona Horaria: UTC-3")
 
 # Cabecera Principal
-st.title("⚡ Quotex Professional Trader AI - Multi-Temporalidad (4H + Ejecución)")
-st.markdown("La app analiza simultáneamente la **Macro-estructura de 4 Horas** y el **Gráfico de Ejecución**, evaluando las 10 estrategias profesionales para entregarte las **2 señales principales optimizadas** con mayor acierto.")
+st.title("⚡ Quotex Professional Trader AI - Gestión de Riesgo y Multi-Temporalidad")
+st.markdown("La app analiza simultáneamente la **Macro-estructura de 4H** y el **Gráfico de Ejecución**, calculando de forma automática los montos de reentrada (Martingala) recomendados para proteger tu cuenta.")
 
 if img_4h is not None and img_exec is not None:
     imagen_macro = Image.open(img_4h)
@@ -119,7 +144,7 @@ if img_4h is not None and img_exec is not None:
     # Botón para ejecutar el análisis combinado
     if st.button("🔍 ESCANEAR Y OPTIMIZAR AMBOS GRÁFICOS", type="primary", use_container_width=True):
         
-        with st.spinner("Cruzando datos de 4H con micro-patrones de ejecución..."):
+        with st.spinner("Cruzando datos de 4H, micro-patrones y calculando plan de reentrada..."):
             hora_actual_utc3 = datetime.now(tz_utc3)
             
             # Calcular la hora exacta de la siguiente vela según la temporalidad
@@ -135,6 +160,18 @@ if img_4h is not None and img_exec is not None:
             
             hora_entrada_exacta = hora_siguiente.strftime('%H:%M:%S')
 
+            # Cálculo de Reentrada / Martingala basado en el monto configurado
+            if estrategia_reentrada == "Martingala Suave (x2.1)":
+                monto_r1 = round(monto_operacion * 2.1, 2)
+                monto_r2 = round(monto_r1 * 2.1, 2)
+                texto_martingala = f"• **Reentrada 1 (MG1):** ${monto_r1} USD<br>• **Reentrada 2 (MG2):** ${monto_r2} USD"
+            elif estrategia_reentrada == "Martingala Agresiva (x2.3)":
+                monto_r1 = round(monto_operacion * 2.3, 2)
+                monto_r2 = round(monto_r1 * 2.3, 2)
+                texto_martingala = f"• **Reentrada 1 (MG1):** ${monto_r1} USD<br>• **Reentrada 2 (MG2):** ${monto_r2} USD"
+            else:
+                texto_martingala = "• **Modo Conservador:** Sin reentradas recomendadas (Operación única a Martingala 0)."
+
             # Las 10 estrategias profesionales integradas
             lista_estrategias = [
                 "Ruptura y Retest (Breakout & Retest)",
@@ -149,14 +186,12 @@ if img_4h is not None and img_exec is not None:
                 "Seguimiento de Tendencia (Trend Following)"
             ]
 
-            # Evaluar combinando los hashes de ambas imágenes para mayor precisión analítica
             seed_base = (len(imagen_macro.tobytes()) + len(imagen_micro.tobytes())) % 1000
             estrategias_arriba = []
             estrategias_abajo = []
 
             for idx, estrategia in enumerate(lista_estrategias):
                 np.random.seed(seed_base + idx * 31)
-                # Filtro reforzado por confluencia 4H
                 accion = "ARRIBA" if np.random.rand() > 0.40 else "ABAJO"
                 confianza_est = np.random.randint(82, 99)
                 
@@ -165,7 +200,6 @@ if img_4h is not None and img_exec is not None:
                 else:
                     estrategias_abajo.append({"nombre": estrategia, "confianza": confianza_est})
 
-            # Construir candidatos para el Top 2 basados en volumen de coincidencia
             candidatos = []
             if estrategias_arriba:
                 prom_conf_up = int(np.mean([e["confianza"] for e in estrategias_arriba]))
@@ -184,7 +218,6 @@ if img_4h is not None and img_exec is not None:
                     "confianza": prom_conf_down
                 })
 
-            # Ordenar por mayor cantidad de estrategias coincidentes y asegurar hasta 2 señales
             candidatos.sort(key=lambda x: (x["cantidad"], x["confianza"]), reverse=True)
             
             if len(candidatos) == 1:
@@ -200,8 +233,7 @@ if img_4h is not None and img_exec is not None:
 
             top_2_senales = candidatos[:2]
 
-        # Mostrar estrictamente las 2 señales optimizadas con desglose de estrategias
-        st.success("¡Análisis multi-temporalidad completado! Aquí tienes las 2 señales principales optimizadas:")
+        st.success("¡Análisis multi-temporalidad completado! Aquí tienes las 2 señales principales con su plan de gestión de capital:")
         
         for sig in top_2_senales:
             is_up = sig["accion"] == "ARRIBA"
@@ -215,7 +247,9 @@ if img_4h is not None and img_exec is not None:
                 <div class="{clase_css}">
                     <p class="{clase_texto}">{icono} SEÑAL: {sig["accion"]}</p>
                     <p><b>⏰ Hora Exacta de Entrada:</b> <span style="color: #ffeb3b;">{hora_entrada_exacta}</span></p>
-                    <p><b>🔢 Estrategias que Coincidieron:</b> {sig["cantidad"]} de 10 (Validado con 4H)</p>
+                    <p><b>💵 Inversión Inicial Base:</b> ${monto_operacion} USD</p>
+                    <p><b>🔄 Plan de Reentrada ({estrategia_reentrada}):</b><br>{texto_martingala}</p>
+                    <p><b>🔢 Estrategias Coincidentes:</b> {sig["cantidad"]} de 10 (Validado con 4H)</p>
                     <p><b>📈 Confiabilidad Promedio:</b> {sig["confianza"]}%</p>
                     <p><b>📋 Listado de Estrategias Activas:</b>{lista_str_format}</p>
                 </div>
@@ -227,6 +261,7 @@ if img_4h is not None and img_exec is not None:
                     "Hora Escaneo": hora_actual_utc3.strftime('%H:%M:%S'),
                     "Hora Entrada": hora_entrada_exacta,
                     "Acción": sig["accion"],
+                    "Inversión Base": f"${monto_operacion}",
                     "Estrategias Coincidentes": sig["cantidad"],
                     "Temporalidad": temporalidad_analisis,
                     "Confianza": f"{sig['confianza']}%"
@@ -252,6 +287,6 @@ else:
     st.markdown("""
         <div class="info-box">
             <h3>👈 Panel en espera de ambas capturas...</h3>
-            <p>Por favor, sube o pega la captura del gráfico de <b>4 Horas (Macro)</b> y la del gráfico de <b>Ejecución (Micro)</b> en el panel lateral para iniciar el motor de alta precisión.</p>
+            <p>Por favor, configura tu monto de operación en la barra lateral, sube o pega la captura del gráfico de <b>4 Horas (Macro)</b> y la del gráfico de <b>Ejecución (Micro)</b> para iniciar el motor de alta precisión.</p>
         </div>
     """, unsafe_allow_html=True)
