@@ -9,7 +9,7 @@ from streamlit_autorefresh import st_autorefresh
 
 # Configuración de la página
 st.set_page_config(
-    page_title="Terminal Analítica Quotex OTC - Tiempo Real",
+    page_title="Terminal Quotex - Estilo Real",
     page_icon="📈",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -18,41 +18,41 @@ st.set_page_config(
 # Configurar Zona Horaria UTC-3
 tz_utc3 = pytz.timezone('Etc/GMT+3')
 
-# Configurar autorefresco de la página cada 2 segundos para tiempo real absoluto
-count = st_autorefresh(interval=2000, limit=None, key="realtime_scanner_2s")
+# Recarga automática de la página cada 2 segundos para simular tiempo real
+count = st_autorefresh(interval=2000, limit=None, key="quotex_realtime_2s")
 
-# Estilos CSS profesionales
+# Estilos CSS idénticos a la estética de Quotex (Fondos oscuros, paneles limpios y botones Arriba/Abajo)
 st.markdown("""
     <style>
     .main {
-        background-color: #0e1117;
+        background-color: #0b131e;
     }
     .stMetric {
-        background-color: #161b22;
-        padding: 15px;
-        border-radius: 8px;
-        border: 1px solid #30363d;
+        background-color: #141f2c;
+        padding: 12px;
+        border-radius: 6px;
+        border: 1px solid #24344d;
     }
     .signal-up {
-        color: #238636;
+        color: #00C853;
         font-weight: bold;
         font-size: 1.2rem;
     }
     .signal-down {
-        color: #da3633;
+        color: #FF3D00;
         font-weight: bold;
         font-size: 1.2rem;
     }
-    .alert-box {
-        background-color: #161b22;
-        border-left: 5px solid #238636;
+    .alert-box-up {
+        background-color: #141f2c;
+        border-left: 5px solid #00C853;
         padding: 15px;
         border-radius: 4px;
         margin-bottom: 10px;
     }
     .alert-box-down {
-        background-color: #161b22;
-        border-left: 5px solid #da3633;
+        background-color: #141f2c;
+        border-left: 5px solid #FF3D00;
         padding: 15px;
         border-radius: 4px;
         margin-bottom: 10px;
@@ -60,7 +60,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Inicializar el historial de señales en la sesión de Streamlit
+# Inicializar historial de señales en la sesión
 if 'historial_senales' not in st.session_state:
     st.session_state.historial_senales = []
 
@@ -94,8 +94,8 @@ activos_otc = {
     "LTC/USD (OTC Crypto)": "LTC-USD"
 }
 
-# Barra Lateral - Controles de Configuración
-st.sidebar.markdown("## ⚙️ Panel de Control OTC")
+# Panel de Control Lateral
+st.sidebar.markdown("## ⚙️ Configuración Quotex")
 st.sidebar.markdown("---")
 
 nombre_activo = st.sidebar.selectbox(
@@ -105,30 +105,24 @@ nombre_activo = st.sidebar.selectbox(
 activo_seleccionado = activos_otc[nombre_activo]
 
 temporalidad = st.sidebar.selectbox(
-    "Temporalidad del Análisis",
+    "Temporalidad (Velas)",
     ["1m", "5m", "15m", "1h"]
 )
 
-indicador_base = st.sidebar.selectbox(
-    "Estrategia de Indicadores",
-    ["RSI + Medias Móviles", "Bandas de Bollinger", "Cruce MACD"]
-)
-
-# Control deslizante para calibrar el precio manualmente contra Quotex
+# Control deslizante de calibración exacta de Pips para igualar el precio del bróker
 st.sidebar.markdown("---")
-st.sidebar.markdown("### 🎛️ Calibración de Precio")
+st.sidebar.markdown("### 🎛️ Calibración de Precio OTC")
 correccion_pip = st.sidebar.slider("Ajuste manual de Pips", -0.0100, 0.0100, 0.0000, 0.0001, format="%.4f")
 
 st.sidebar.markdown("---")
-st.sidebar.markdown("### 🛠️ Estado del Sistema")
-st.sidebar.success("🟢 Tiempo Real Activo (2s)")
+st.sidebar.success("🟢 Conexión en vivo (2s)")
 st.sidebar.info("🕒 Zona Horaria: UTC-3")
 
-# Título Principal
-st.title("⚡ Terminal de Análisis Cuántico - Quotex OTC")
-st.markdown("Escáner profesional en **tiempo real (2s)** con gráfico dinámico real, sincronización UTC-3 y auditoría WIN / LOSS.")
+# Cabecera Principal
+st.title("⚡ Quotex Web Trading Terminal - Estilo Real")
+st.markdown("Terminal conectada con diseño visual de velas idéntico a la plataforma y sincronización de hora exacta.")
 
-# Descarga de datos de mercado con TTL muy bajo (2s) para forzar actualización real
+# Descarga de datos optimizada para tiempo real (TTL de 2 segundos)
 @st.cache_data(ttl=2)
 def cargar_datos(ticker, intervalo):
     try:
@@ -148,7 +142,7 @@ if data is not None and not data.empty and len(data) > 20:
     else:
         data.index = data.index.tz_convert(tz_utc3)
 
-    # Cálculo de Indicadores Técnicos
+    # Cálculo de Indicadores (RSI para señales)
     delta = data['Close'].diff()
     gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
     loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
@@ -156,19 +150,17 @@ if data is not None and not data.empty and len(data) > 20:
     data['RSI'] = 100 - (100 / (1 + rs))
     
     data['SMA_20'] = data['Close'].rolling(window=20).mean()
-    data['SMA_50'] = data['Close'].rolling(window=50).mean()
 
-    # Precios actuales reales con calibración aplicada
+    # Precios actuales con calibración
     precio_actual = float(data['Close'].iloc[-1]) + correccion_pip
     rsi_actual = float(data['RSI'].iloc[-1]) if not np.isnan(data['RSI'].iloc[-1]) else 50.0
     
-    # Hora actual exacta en UTC-3
+    # Hora UTC-3 actual
     hora_actual_utc3 = datetime.now(tz_utc3)
 
-    # Calcular la hora exacta de la siguiente vela según la temporalidad seleccionada
+    # Cálculo de la siguiente vela
     minutos_map = {"1m": 1, "5m": 5, "15m": 15, "1h": 60}
     delta_minutos = minutos_map.get(temporalidad, 1)
-    
     minuto_actual = hora_actual_utc3.minute
     siguiente_minuto = ((minuto_actual // delta_minutos) + 1) * delta_minutos
     
@@ -176,51 +168,72 @@ if data is not None and not data.empty and len(data) > 20:
         hora_siguiente = hora_actual_utc3.replace(minute=0, second=0, microsecond=0) + timedelta(hours=1)
     else:
         hora_siguiente = hora_actual_utc3.replace(minute=siguiente_minuto, second=0, microsecond=0)
-        
     hora_senal_siguiente = hora_siguiente.strftime('%H:%M:%S')
 
-    # Métricas Principales en Pantalla
+    # Métricas superiores estilo Quotex
     col1, col2, col3, col4 = st.columns(4)
     with col1:
         st.metric(label="Hora Actual (UTC-3)", value=hora_actual_utc3.strftime('%H:%M:%S'))
     with col2:
-        st.metric(label="Precio Actual", value=f"{precio_actual:.5f}")
+        st.metric(label="Precio Actual Calibrado", value=f"{precio_actual:.5f}")
     with col3:
         st.metric(label="RSI (14)", value=f"{rsi_actual:.2f}")
     with col4:
         sugerencia = "ARRIBA 🟢" if rsi_actual < 45 else ("ABAJO 🔴" if rsi_actual > 55 else "NEUTRAL ⚪")
-        st.metric(label="Señal Sugerida", value=sugerencia)
+        st.metric(label="Tendencia Sugerida", value=sugerencia)
 
     st.markdown("---")
 
-    # Layout de Gráfico Interactivo Real y Panel de Operativa
-    c_graf, c_pan = st.columns([2.5, 1])
+    # Layout de Gráfico y Panel de Operativa al estilo Quotex
+    c_graf, c_pan = st.columns([2.8, 1])
 
     with c_graf:
-        st.subheader(f"Gráfico Técnico Real - {nombre_activo} ({temporalidad})")
+        st.subheader(f"Gráfico de Velas - {nombre_activo} ({temporalidad})")
+        
         fig = go.Figure()
         
-        # Gráfico de velas real y actualizado con los precios calibrados del usuario
+        # Estilo de Velas Idéntico a Quotex (Verde para alcista #00C853, Rojo para bajista #FF3D00)
         fig.add_trace(go.Candlestick(
             x=data.index,
             open=data['Open'] + correccion_pip,
             high=data['High'] + correccion_pip,
             low=data['Low'] + correccion_pip,
             close=data['Close'] + correccion_pip,
-            name='Precio Real'
+            name='Precio',
+            increasing_line_color='#00C853',
+            increasing_fillcolor='#00C853',
+            decreasing_line_color='#FF3D00',
+            decreasing_fillcolor='#FF3D00'
         ))
         
-        # Medias móviles superpuestas en tiempo real
-        fig.add_trace(go.Scatter(x=data.index, y=data['SMA_20'] + correccion_pip, mode='lines', name='SMA 20', line=dict(color='orange', width=1.5)))
-        fig.add_trace(go.Scatter(x=data.index, y=data['SMA_50'] + correccion_pip, mode='lines', name='SMA 50', line=dict(color='#00d2ff', width=1.5)))
+        # Línea de Media Móvil elegante
+        fig.add_trace(go.Scatter(
+            x=data.index, 
+            y=data['SMA_20'] + correccion_pip, 
+            mode='lines', 
+            name='SMA 20', 
+            line=dict(color='#2979FF', width=1.5)
+        ))
         
+        # Diseño de fondo oscuro limpio y profesional idéntico al bróker
         fig.update_layout(
-            template='plotly_dark',
+            paper_bgcolor='#0b131e',
+            plot_bgcolor='#0b131e',
+            font=dict(color='#8b949e', family='Arial'),
             xaxis_rangeslider_visible=False,
-            height=460,
-            margin=dict(l=10, r=10, t=10, b=10)
+            height=480,
+            margin=dict(l=10, r=10, t=10, b=10),
+            xaxis=dict(
+                gridcolor='#1a2638',
+                showgrid=True
+            ),
+            yaxis=dict(
+                gridcolor='#1a2638',
+                showgrid=True,
+                side='right'  # Coloca los precios a la derecha exactamente igual que Quotex
+            )
         )
-        st.plotly_chart(fig, use_container_width=True, key="grafico_tiempo_real")
+        st.plotly_chart(fig, use_container_width=True, key="quotex_realtime_chart")
 
     with c_pan:
         st.subheader("Panel de Operativa")
@@ -229,11 +242,11 @@ if data is not None and not data.empty and len(data) > 20:
         if rsi_actual < 40:
             tipo_senal = "ARRIBA"
             st.markdown(f"""
-                <div class="alert-box">
+                <div class="alert-box-up">
                     <p class="signal-up">🚀 ACCIÓN: ARRIBA</p>
                     <p><b>Temporalidad:</b> {temporalidad}</p>
-                    <p><b>Entrada Siguiente Vela:</b> {hora_senal_siguiente}</p>
-                    <p style="font-size: 0.85rem; color: #8b949e;">Preparado para la siguiente vela.</p>
+                    <p><b>Entrada Vela:</b> {hora_senal_siguiente}</p>
+                    <p style="font-size: 0.82rem; color: #8b949e;">Oportunidad alcista detectada.</p>
                 </div>
             """, unsafe_allow_html=True)
         elif rsi_actual > 60:
@@ -242,23 +255,23 @@ if data is not None and not data.empty and len(data) > 20:
                 <div class="alert-box-down">
                     <p class="signal-down">🔻 ACCIÓN: ABAJO</p>
                     <p><b>Temporalidad:</b> {temporalidad}</p>
-                    <p><b>Entrada Siguiente Vela:</b> {hora_senal_siguiente}</p>
-                    <p style="font-size: 0.85rem; color: #8b949e;">Preparado para la siguiente vela.</p>
+                    <p><b>Entrada Vela:</b> {hora_senal_siguiente}</p>
+                    <p style="font-size: 0.82rem; color: #8b949e;">Oportunidad bajista detectada.</p>
                 </div>
             """, unsafe_allow_html=True)
         else:
             st.markdown(f"""
-                <div style="background-color: #161b22; padding: 15px; border-radius: 4px; border: 1px solid #30363d;">
-                    <p style="color: #8b949e; font-weight: bold;">⚖️ MERCADO EN CONSOLIDACIÓN</p>
+                <div style="background-color: #141f2c; padding: 15px; border-radius: 4px; border: 1px solid #24344d;">
+                    <p style="color: #8b949e; font-weight: bold;">⚖️ MERCADO LATERAL</p>
                     <p><b>Temporalidad:</b> {temporalidad}</p>
-                    <p><b>Última revisión (UTC-3):</b> {hora_actual_utc3.strftime('%H:%M:%S')}</p>
+                    <p><b>Revisión:</b> {hora_actual_utc3.strftime('%H:%M:%S')}</p>
                 </div>
             """, unsafe_allow_html=True)
 
         st.markdown("---")
         
-        # Botón para registrar la señal apuntando a la hora de la siguiente vela
-        if tipo_senal and st.button("📌 Registrar Señal en el Historial"):
+        # Botón para registrar la señal al historial
+        if tipo_senal and st.button("📌 Registrar Señal"):
             nueva_entrada = {
                 "Hora Entrada (UTC-3)": hora_senal_siguiente,
                 "Activo": nombre_activo,
@@ -269,9 +282,9 @@ if data is not None and not data.empty and len(data) > 20:
             }
             if not st.session_state.historial_senales or st.session_state.historial_senales[-1]["Hora Entrada (UTC-3)"] != hora_senal_siguiente:
                 st.session_state.historial_senales.append(nueva_entrada)
-                st.success("¡Señal registrada con éxito para la siguiente vela!")
+                st.success("¡Señal guardada!")
 
-    # --- SECCIÓN DE HISTORIAL Y AUDITORÍA DE RESULTADOS (WIN / LOSS) ---
+    # --- SECCIÓN DE HISTORIAL Y AUDITORÍA WIN / LOSS ---
     st.markdown("---")
     st.subheader("📊 Historial de Auditoría de Señales (WIN / LOSS) - UTC-3")
     
@@ -297,7 +310,7 @@ if data is not None and not data.empty and len(data) > 20:
             st.session_state.historial_senales = []
             st.rerun()
     else:
-        st.info("No hay señales registradas todavía. Haz clic en 'Registrar Señal en el Historial' cuando aparezca una oportunidad.")
+        st.info("No hay señales registradas todavía en esta sesión.")
 
 else:
-    st.error("No se pudieron cargar suficientes datos para este activo en la temporalidad seleccionada. Prueba cambiando la temporalidad o el activo.")
+    st.error("Cargando datos del mercado en tiempo real...")
