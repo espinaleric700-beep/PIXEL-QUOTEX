@@ -9,7 +9,7 @@ from streamlit_autorefresh import st_autorefresh
 
 # Configuración de la página
 st.set_page_config(
-    page_title="Terminal Quotex - Estilo Real",
+    page_title="Terminal Quotex - Tiempo Real",
     page_icon="📈",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -18,10 +18,10 @@ st.set_page_config(
 # Configurar Zona Horaria UTC-3
 tz_utc3 = pytz.timezone('Etc/GMT+3')
 
-# Recarga automática de la página cada 2 segundos para simular tiempo real
+# Recarga automática de la página cada 2 segundos para tiempo real
 count = st_autorefresh(interval=2000, limit=None, key="quotex_realtime_2s")
 
-# Estilos CSS idénticos a la estética de Quotex (Fondos oscuros, paneles limpios y botones Arriba/Abajo)
+# Estilos CSS idénticos a la estética de Quotex
 st.markdown("""
     <style>
     .main {
@@ -109,18 +109,13 @@ temporalidad = st.sidebar.selectbox(
     ["1m", "5m", "15m", "1h"]
 )
 
-# Control deslizante de calibración exacta de Pips para igualar el precio del bróker
-st.sidebar.markdown("---")
-st.sidebar.markdown("### 🎛️ Calibración de Precio OTC")
-correccion_pip = st.sidebar.slider("Ajuste manual de Pips", -0.0100, 0.0100, 0.0000, 0.0001, format="%.4f")
-
 st.sidebar.markdown("---")
 st.sidebar.success("🟢 Conexión en vivo (2s)")
 st.sidebar.info("🕒 Zona Horaria: UTC-3")
 
 # Cabecera Principal
-st.title("⚡ Quotex Web Trading Terminal - Estilo Real")
-st.markdown("Terminal conectada con diseño visual de velas idéntico a la plataforma y sincronización de hora exacta.")
+st.title("⚡ Quotex Web Trading Terminal - Tiempo Real")
+st.markdown("Terminal en vivo con diseño de velas profesional y sincronización de hora exacta.")
 
 # Descarga de datos optimizada para tiempo real (TTL de 2 segundos)
 @st.cache_data(ttl=2)
@@ -151,8 +146,8 @@ if data is not None and not data.empty and len(data) > 20:
     
     data['SMA_20'] = data['Close'].rolling(window=20).mean()
 
-    # Precios actuales con calibración
-    precio_actual = float(data['Close'].iloc[-1]) + correccion_pip
+    # Precios actuales reales sin modificaciones manuales
+    precio_actual = float(data['Close'].iloc[-1])
     rsi_actual = float(data['RSI'].iloc[-1]) if not np.isnan(data['RSI'].iloc[-1]) else 50.0
     
     # Hora UTC-3 actual
@@ -175,7 +170,7 @@ if data is not None and not data.empty and len(data) > 20:
     with col1:
         st.metric(label="Hora Actual (UTC-3)", value=hora_actual_utc3.strftime('%H:%M:%S'))
     with col2:
-        st.metric(label="Precio Actual Calibrado", value=f"{precio_actual:.5f}")
+        st.metric(label="Precio Actual", value=f"{precio_actual:.5f}")
     with col3:
         st.metric(label="RSI (14)", value=f"{rsi_actual:.2f}")
     with col4:
@@ -195,10 +190,10 @@ if data is not None and not data.empty and len(data) > 20:
         # Estilo de Velas Idéntico a Quotex (Verde para alcista #00C853, Rojo para bajista #FF3D00)
         fig.add_trace(go.Candlestick(
             x=data.index,
-            open=data['Open'] + correccion_pip,
-            high=data['High'] + correccion_pip,
-            low=data['Low'] + correccion_pip,
-            close=data['Close'] + correccion_pip,
+            open=data['Open'],
+            high=data['High'],
+            low=data['Low'],
+            close=data['Close'],
             name='Precio',
             increasing_line_color='#00C853',
             increasing_fillcolor='#00C853',
@@ -209,7 +204,7 @@ if data is not None and not data.empty and len(data) > 20:
         # Línea de Media Móvil elegante
         fig.add_trace(go.Scatter(
             x=data.index, 
-            y=data['SMA_20'] + correccion_pip, 
+            y=data['SMA_20'], 
             mode='lines', 
             name='SMA 20', 
             line=dict(color='#2979FF', width=1.5)
