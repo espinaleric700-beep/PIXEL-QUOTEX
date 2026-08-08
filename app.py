@@ -18,7 +18,7 @@ st.set_page_config(
 # Configurar Zona Horaria UTC-3
 tz_utc3 = pytz.timezone('Etc/GMT+3')
 
-# Recarga automática de la página cada 2 segundos para tiempo real
+# Recarga automática estricta cada 2 segundos para garantizar actualización en tiempo real absoluto
 count = st_autorefresh(interval=2000, limit=None, key="quotex_realtime_2s")
 
 # Estilos CSS idénticos a la estética de Quotex
@@ -94,7 +94,7 @@ activos_otc = {
     "LTC/USD (OTC Crypto)": "LTC-USD"
 }
 
-# Panel de Control Lateral
+# Panel de Control Lateral (Sin calibración manual para reflejar el precio real directo)
 st.sidebar.markdown("## ⚙️ Configuración Quotex")
 st.sidebar.markdown("---")
 
@@ -115,11 +115,10 @@ st.sidebar.info("🕒 Zona Horaria: UTC-3")
 
 # Cabecera Principal
 st.title("⚡ Quotex Web Trading Terminal - Tiempo Real")
-st.markdown("Terminal en vivo con diseño de velas profesional y sincronización de hora exacta.")
+st.markdown("Terminal en vivo con diseño de velas profesional, precio actual real y sincronización de hora exacta.")
 
-# Descarga de datos optimizada para tiempo real (TTL de 2 segundos)
-@st.cache_data(ttl=2)
-def cargar_datos(ticker, intervalo):
+# Descarga directa de datos sin caché estática pesada para forzar lectura inmediata
+def cargar_datos_tiempo_real(ticker, intervalo):
     try:
         df = yf.download(ticker, period="1d", interval=intervalo, progress=False)
         if isinstance(df.columns, pd.MultiIndex):
@@ -128,7 +127,7 @@ def cargar_datos(ticker, intervalo):
     except Exception as e:
         return None
 
-data = cargar_datos(activo_seleccionado, temporalidad)
+data = cargar_datos_tiempo_real(activo_seleccionado, temporalidad)
 
 if data is not None and not data.empty and len(data) > 20:
     # Convertir índice a la zona horaria UTC-3
@@ -137,7 +136,7 @@ if data is not None and not data.empty and len(data) > 20:
     else:
         data.index = data.index.tz_convert(tz_utc3)
 
-    # Cálculo de Indicadores (RSI para señales)
+    # Cálculo de Indicadores Técnicos (RSI y SMA)
     delta = data['Close'].diff()
     gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
     loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
@@ -146,14 +145,14 @@ if data is not None and not data.empty and len(data) > 20:
     
     data['SMA_20'] = data['Close'].rolling(window=20).mean()
 
-    # Precios actuales reales sin modificaciones manuales
+    # Obtener el precio actual exacto del mercado en tiempo real
     precio_actual = float(data['Close'].iloc[-1])
     rsi_actual = float(data['RSI'].iloc[-1]) if not np.isnan(data['RSI'].iloc[-1]) else 50.0
     
-    # Hora UTC-3 actual
+    # Hora UTC-3 actual sincronizada al segundo
     hora_actual_utc3 = datetime.now(tz_utc3)
 
-    # Cálculo de la siguiente vela
+    # Cálculo de la siguiente vela según la temporalidad
     minutos_map = {"1m": 1, "5m": 5, "15m": 15, "1h": 60}
     delta_minutos = minutos_map.get(temporalidad, 1)
     minuto_actual = hora_actual_utc3.minute
@@ -170,7 +169,7 @@ if data is not None and not data.empty and len(data) > 20:
     with col1:
         st.metric(label="Hora Actual (UTC-3)", value=hora_actual_utc3.strftime('%H:%M:%S'))
     with col2:
-        st.metric(label="Precio Actual", value=f"{precio_actual:.5f}")
+        st.metric(label="Precio Actual Real", value=f"{precio_actual:.5f}")
     with col3:
         st.metric(label="RSI (14)", value=f"{rsi_actual:.2f}")
     with col4:
@@ -210,7 +209,7 @@ if data is not None and not data.empty and len(data) > 20:
             line=dict(color='#2979FF', width=1.5)
         ))
         
-        # Diseño de fondo oscuro limpio y profesional idéntico al bróker
+        # Diseño de fondo oscuro limpio y profesional idéntico al bróker con precios a la derecha
         fig.update_layout(
             paper_bgcolor='#0b131e',
             plot_bgcolor='#0b131e',
@@ -225,7 +224,7 @@ if data is not None and not data.empty and len(data) > 20:
             yaxis=dict(
                 gridcolor='#1a2638',
                 showgrid=True,
-                side='right'  # Coloca los precios a la derecha exactamente igual que Quotex
+                side='right'
             )
         )
         st.plotly_chart(fig, use_container_width=True, key="quotex_realtime_chart")
@@ -265,7 +264,7 @@ if data is not None and not data.empty and len(data) > 20:
 
         st.markdown("---")
         
-        # Botón para registrar la señal al historial
+        # Botón para registrar la señal al historial con la hora de la siguiente vela
         if tipo_senal and st.button("📌 Registrar Señal"):
             nueva_entrada = {
                 "Hora Entrada (UTC-3)": hora_senal_siguiente,
