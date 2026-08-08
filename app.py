@@ -172,16 +172,14 @@ if img_4h is not None and img_exec is not None:
             np.random.seed(seed_base)
             np.random.shuffle(lista_estrategias)
             
-            # Forzar una distribución asimétrica real (ej: 7 contra 3, o 8 contra 2)
             corte = np.random.choice([7, 8])
             estrategias_principal = lista_estrategias[:corte]
             estrategias_secundaria = lista_estrategias[corte:]
 
             candidatos = []
             
-            # Asignar una brecha de confianza amplia y real
-            conf_principal = np.random.randint(91, 98)
-            conf_secundaria = np.random.randint(58, 72) # Baja confiabilidad para la contraria
+            conf_principal = int(np.random.randint(91, 98))
+            conf_secundaria = int(np.random.randint(58, 72))
 
             candidatos.append({
                 "accion": "ARRIBA" if seed_base % 2 == 0 else "ABAJO",
@@ -212,6 +210,7 @@ if img_4h is not None and img_exec is not None:
             icono = "🟢" if is_principal else "⚠️"
             
             lista_str_format = "<br>• " + "<br>• ".join(sig["estrategias"])
+            confianza_val = sig["confianza"]
             
             st.markdown(f"""
                 <div class="{clase_css}">
@@ -220,7 +219,7 @@ if img_4h is not None and img_exec is not None:
                     {'<p><b>💵 Inversión Inicial Base:</b> $' + str(monto_operacion) + ' USD</p>' if is_principal else ''}
                     {'<p><b>🔄 Plan de Reentrada (' + estrategia_reentrada + '):</b><br>' + texto_martingala + '</p>' if is_principal else ''}
                     <p><b>🔢 Estrategias a Favor:</b> {sig["cantidad"]} de 10</p>
-                    <p><b>📈 Confiabilidad Técnica:</b> {sig["confianza']}%</p>
+                    <p><b>📈 Confiabilidad Técnica:</b> {confianza_val}%</p>
                     <p><b>📋 Indicadores Detectados:</b>{lista_str_format}</p>
                 </div>
             """, unsafe_allow_html=True)
