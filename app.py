@@ -39,6 +39,7 @@ st.markdown("""
 
 # Lista completa de activos OTC populares en plataformas de opciones binarias simulados mediante tickers equivalentes/cercanos en Yahoo Finance
 activos_otc = {
+    "USD/BRL (OTC)": "USDBRL=X",
     "EUR/USD (OTC)": "EURUSD=X",
     "GBP/USD (OTC)": "GBPUSD=X",
     "USD/JPY (OTC)": "USDJPY=X",
@@ -132,7 +133,7 @@ if data is not None and not data.empty and len(data) > 20:
     with col3:
         st.metric(label="RSI (14)", value=f"{rsi_actual:.2f}")
     with col4:
-        # Lógica de Sugerencia Automática
+        # Lógica de Sugerencia Automática con terminología personalizada
         sugerencia = "ARRIBA 🟢" if rsi_actual < 45 else ("ABAJO 🔴" if rsi_actual > 55 else "NEUTRAL ⚪")
         st.metric(label="Señal Sugerida", value=sugerencia)
 
@@ -167,17 +168,17 @@ if data is not None and not data.empty and len(data) > 20:
         st.markdown("Basado en el análisis algorítmico actual:")
         
         if rsi_actual < 40:
-            st.markdown('<p class="signal-up">🚀 Oportunidad de Compra: ARRIBA</p>', unsafe_allow_html=True)
+            st.markdown('<p class="signal-up">🚀 Oportunidad: ARRIBA</p>', unsafe_allow_html=True)
             st.info("El activo se encuentra en zona de sobreventa técnica.")
         elif rsi_actual > 60:
-            st.markdown('<p class="signal-down">🔻 Oportunidad de Venta: ABAJO</p>', unsafe_allow_html=True)
+            st.markdown('<p class="signal-down">🔻 Oportunidad: ABAJO</p>', unsafe_allow_html=True)
             st.warning("El activo se encuentra en zona de sobrecompra técnica.")
         else:
             st.markdown('<p style="color: #8b949e;">⚖️ Mercado en Consolidación. Esperar confirmación.</p>', unsafe_allow_html=True)
 
         st.markdown("---")
         
-        # Botón de control de interfaz seguro (Mantiene la sesión y los datos)
+        # Botón de control de interfaz seguro que actualiza sin perder la sesión
         if st.button("🔄 Actualizar Escáner"):
             st.rerun()
 
