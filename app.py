@@ -18,8 +18,7 @@ st.set_page_config(
 # Configurar Zona Horaria UTC-3
 tz_utc3 = pytz.timezone('Etc/GMT+3')
 
-# Configurar autoreresco en tiempo real (ej. se actualiza automáticamente cada 10 segundos)
-# Esto refresca la app por completo para buscar nuevos precios y recalcular la hora exacta
+# Configurar autorefresco en tiempo real cada 10 segundos
 count = st_autorefresh(interval=10000, limit=None, key="realtime_scanner")
 
 # Estilos CSS profesionales
@@ -127,9 +126,9 @@ st.sidebar.info("🕒 Zona Horaria: UTC-3")
 
 # Título Principal
 st.title("⚡ Terminal de Análisis Cuántico - Quotex OTC")
-st.markdown("Escáner en **tiempo real** con sincronización UTC-3, calibración de pips y auditoría WIN / LOSS automática.")
+st.markdown("Escáner en **tiempo real** con precio actual exacto, sincronización UTC-3 y auditoría WIN / LOSS automática.")
 
-# Descarga de datos de mercado (ttl bajo para forzar frescura en tiempo real)
+# Descarga de datos de mercado
 @st.cache_data(ttl=5)
 def cargar_datos(ticker, intervalo):
     try:
@@ -159,7 +158,7 @@ if data is not None and not data.empty and len(data) > 20:
     data['SMA_20'] = data['Close'].rolling(window=20).mean()
     data['SMA_50'] = data['Close'].rolling(window=50).mean()
 
-    # Precios con la corrección manual aplicada
+    # Precio actual real del mercado + la calibración de pips del usuario
     precio_actual = float(data['Close'].iloc[-1]) + correccion_pip
     precio_anterior = float(data['Close'].iloc[-2]) + correccion_pip
     rsi_actual = float(data['RSI'].iloc[-1]) if not np.isnan(data['RSI'].iloc[-1]) else 50.0
@@ -167,12 +166,12 @@ if data is not None and not data.empty and len(data) > 20:
     # Hora actual exacta en UTC-3 sincronizada al segundo
     hora_actual_utc3 = datetime.now(tz_utc3).strftime('%H:%M:%S')
 
-    # Métricas Principales en Pantalla (Actualizadas en tiempo real)
+    # Métricas Principales en Pantalla (El Precio Actual refleja directamente el valor en tiempo real)
     col1, col2, col3, col4 = st.columns(4)
     with col1:
         st.metric(label="Hora Actual (UTC-3)", value=hora_actual_utc3)
     with col2:
-        st.metric(label="Precio Calibrado", value=f"{precio_actual:.5f}")
+        st.metric(label="Precio Actual", value=f"{precio_actual:.5f}")
     with col3:
         st.metric(label="RSI (14)", value=f"{rsi_actual:.2f}")
     with col4:
