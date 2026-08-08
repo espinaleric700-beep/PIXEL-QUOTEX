@@ -5,10 +5,11 @@ import yfinance as yf
 import plotly.graph_objects as go
 from datetime import datetime
 import pytz
+from streamlit_autorefresh import st_autorefresh
 
 # Configuración de la página
 st.set_page_config(
-    page_title="Terminal Analítica Quotex OTC",
+    page_title="Terminal Analítica Quotex OTC - Tiempo Real",
     page_icon="📈",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -16,6 +17,10 @@ st.set_page_config(
 
 # Configurar Zona Horaria UTC-3
 tz_utc3 = pytz.timezone('Etc/GMT+3')
+
+# Configurar autoreresco en tiempo real (ej. se actualiza automáticamente cada 10 segundos)
+# Esto refresca la app por completo para buscar nuevos precios y recalcular la hora exacta
+count = st_autorefresh(interval=10000, limit=None, key="realtime_scanner")
 
 # Estilos CSS profesionales
 st.markdown("""
@@ -117,15 +122,15 @@ correccion_pip = st.sidebar.slider("Ajuste manual de Pips", -0.0100, 0.0100, 0.0
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("### 🛠️ Estado del Sistema")
-st.sidebar.success("🟢 Conexión de Datos OTC: Activa")
+st.sidebar.success("🟢 Modo Tiempo Real Activo (10s)")
 st.sidebar.info("🕒 Zona Horaria: UTC-3")
 
 # Título Principal
 st.title("⚡ Terminal de Análisis Cuántico - Quotex OTC")
-st.markdown("Escáner inteligente con calibración manual de precios, registro UTC-3 y auditoría WIN / LOSS.")
+st.markdown("Escáner en **tiempo real** con sincronización UTC-3, calibración de pips y auditoría WIN / LOSS automática.")
 
-# Descarga de datos de mercado
-@st.cache_data(ttl=60)
+# Descarga de datos de mercado (ttl bajo para forzar frescura en tiempo real)
+@st.cache_data(ttl=5)
 def cargar_datos(ticker, intervalo):
     try:
         df = yf.download(ticker, period="1d", interval=intervalo, progress=False)
@@ -144,7 +149,7 @@ if data is not None and not data.empty and len(data) > 20:
     else:
         data.index = data.index.tz_convert(tz_utc3)
 
-    # Cálculo de Indicadores Técnicos (RSI y Medias Móviles)
+    # Cálculo de Indicadores Técnicos
     delta = data['Close'].diff()
     gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
     loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
@@ -154,19 +159,18 @@ if data is not None and not data.empty and len(data) > 20:
     data['SMA_20'] = data['Close'].rolling(window=20).mean()
     data['SMA_50'] = data['Close'].rolling(window=50).mean()
 
-    # Precios con la corrección manual aplicada para igualar a Quotex
+    # Precios con la corrección manual aplicada
     precio_actual = float(data['Close'].iloc[-1]) + correccion_pip
     precio_anterior = float(data['Close'].iloc[-2]) + correccion_pip
     rsi_actual = float(data['RSI'].iloc[-1]) if not np.isnan(data['RSI'].iloc[-1]) else 50.0
     
-    # Hora exacta ajustada a UTC-3
-    ultima_vela_tiempo = data.index[-1]
-    hora_senal = ultima_vela_tiempo.strftime('%H:%M:%S')
+    # Hora actual exacta en UTC-3 sincronizada al segundo
+    hora_actual_utc3 = datetime.now(tz_utc3).strftime('%H:%M:%S')
 
-    # Métricas Principales en Pantalla
+    # Métricas Principales en Pantalla (Actualizadas en tiempo real)
     col1, col2, col3, col4 = st.columns(4)
     with col1:
-        st.metric(label="Activo Seleccionado", value=nombre_activo)
+        st.metric(label="Hora Actual (UTC-3)", value=hora_actual_utc3)
     with col2:
         st.metric(label="Precio Calibrado", value=f"{precio_actual:.5f}")
     with col3:
@@ -181,7 +185,7 @@ if data is not None and not data.empty and len(data) > 20:
     c_graf, c_pan = st.columns([2.5, 1])
 
     with c_graf:
-        st.subheader(f"Gráfico Técnico - {nombre_activo} ({temporalidad}) [UTC-3]")
+        st.subheader(f"Gráfico Técnico - {nombre_activo} ({temporalidad}) [Tiempo Real]")
         fig = go.Figure()
         fig.add_trace(go.Candlestick(
             x=data.index,
@@ -211,7 +215,7 @@ if data is not None and not data.empty and len(data) > 20:
                 <div class="alert-box">
                     <p class="signal-up">🚀 ACCIÓN: ARRIBA</p>
                     <p><b>Temporalidad:</b> {temporalidad}</p>
-                    <p><b>Hora Entrada (UTC-3):</b> {hora_senal}</p>
+                    <p><b>Hora Señal (UTC-3):</b> {hora_actual_utc3}</p>
                     <p style="font-size: 0.85rem; color: #8b949e;">Zona de sobreventa detectada.</p>
                 </div>
             """, unsafe_allow_html=True)
@@ -221,7 +225,7 @@ if data is not None and not data.empty and len(data) > 20:
                 <div class="alert-box-down">
                     <p class="signal-down">🔻 ACCIÓN: ABAJO</p>
                     <p><b>Temporalidad:</b> {temporalidad}</p>
-                    <p><b>Hora Entrada (UTC-3):</b> {hora_senal}</p>
+                    <p><b>Hora Señal (UTC-3):</b> {hora_actual_utc3}</p>
                     <p style="font-size: 0.85rem; color: #8b949e;">Zona de sobrecompra detectada.</p>
                 </div>
             """, unsafe_allow_html=True)
@@ -230,7 +234,7 @@ if data is not None and not data.empty and len(data) > 20:
                 <div style="background-color: #161b22; padding: 15px; border-radius: 4px; border: 1px solid #30363d;">
                     <p style="color: #8b949e; font-weight: bold;">⚖️ MERCADO EN CONSOLIDACIÓN</p>
                     <p><b>Temporalidad:</b> {temporalidad}</p>
-                    <p><b>Última revisión (UTC-3):</b> {hora_senal}</p>
+                    <p><b>Última revisión (UTC-3):</b> {hora_actual_utc3}</p>
                 </div>
             """, unsafe_allow_html=True)
 
@@ -239,19 +243,16 @@ if data is not None and not data.empty and len(data) > 20:
         # Botón para registrar la señal
         if tipo_senal and st.button("📌 Registrar Señal en el Historial"):
             nueva_entrada = {
-                "Hora (UTC-3)": hora_senal,
+                "Hora (UTC-3)": hora_actual_utc3,
                 "Activo": nombre_activo,
                 "Tipo": tipo_senal,
                 "Temporalidad": temporalidad,
                 "Precio_Entrada": precio_anterior,
                 "Estado": "Pendiente / Evaluando"
             }
-            if not st.session_state.historial_senales or st.session_state.historial_senales[-1]["Hora (UTC-3)"] != hora_senal:
+            if not st.session_state.historial_senales or st.session_state.historial_senales[-1]["Hora (UTC-3)"] != hora_actual_utc3:
                 st.session_state.historial_senales.append(nueva_entrada)
                 st.success("¡Señal registrada con éxito en el historial!")
-
-        if st.button("🔄 Actualizar Escáner"):
-            st.rerun()
 
     # --- SECCIÓN DE HISTORIAL Y AUDITORÍA DE RESULTADOS (WIN / LOSS) ---
     st.markdown("---")
