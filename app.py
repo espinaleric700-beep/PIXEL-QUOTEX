@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 import yfinance as yf
 import plotly.graph_objects as go
-from datetime import datetime
+from datetime import datetime, timedelta
 import pytz
 from streamlit_autorefresh import st_autorefresh
 
@@ -126,7 +126,7 @@ st.sidebar.info("🕒 Zona Horaria: UTC-3")
 
 # Título Principal
 st.title("⚡ Terminal de Análisis Cuántico - Quotex OTC")
-st.markdown("Escáner en **tiempo real** con precio actual exacto, sincronización UTC-3 y auditoría WIN / LOSS automática.")
+st.markdown("Escáner en **tiempo real** con hora de entrada proyectada para la **siguiente vela**, sincronización UTC-3 y auditoría WIN / LOSS.")
 
 # Descarga de datos de mercado
 @st.cache_data(ttl=5)
@@ -158,18 +158,33 @@ if data is not None and not data.empty and len(data) > 20:
     data['SMA_20'] = data['Close'].rolling(window=20).mean()
     data['SMA_50'] = data['Close'].rolling(window=50).mean()
 
-    # Precio actual real del mercado + la calibración de pips del usuario
+    # Precios actuales
     precio_actual = float(data['Close'].iloc[-1]) + correccion_pip
     precio_anterior = float(data['Close'].iloc[-2]) + correccion_pip
     rsi_actual = float(data['RSI'].iloc[-1]) if not np.isnan(data['RSI'].iloc[-1]) else 50.0
     
-    # Hora actual exacta en UTC-3 sincronizada al segundo
-    hora_actual_utc3 = datetime.now(tz_utc3).strftime('%H:%M:%S')
+    # Hora actual exacta en UTC-3
+    hora_actual_utc3 = datetime.now(tz_utc3)
 
-    # Métricas Principales en Pantalla (El Precio Actual refleja directamente el valor en tiempo real)
+    # Calcular la hora exacta de la siguiente vela según la temporalidad seleccionada
+    minutos_map = {"1m": 1, "5m": 5, "15m": 15, "1h": 60}
+    delta_minutos = minutos_map.get(temporalidad, 1)
+    
+    # Redondear hacia adelante para calcular el inicio exacto de la siguiente vela
+    minuto_actual = hora_actual_utc3.minute
+    siguiente_minuto = ((minuto_actual // delta_minutos) + 1) * delta_minutos
+    
+    if siguiente_minuto >= 60:
+        hora_siguiente = hora_actual_utc3.replace(minute=0, second=0, microsecond=0) + timedelta(hours=1)
+    else:
+        hora_siguiente = hora_actual_utc3.replace(minute=siguiente_minuto, second=0, microsecond=0)
+        
+    hora_senal_siguiente = hora_siguiente.strftime('%H:%M:%S')
+
+    # Métricas Principales en Pantalla
     col1, col2, col3, col4 = st.columns(4)
     with col1:
-        st.metric(label="Hora Actual (UTC-3)", value=hora_actual_utc3)
+        st.metric(label="Hora Actual (UTC-3)", value=hora_actual_utc3.strftime('%H:%M:%S'))
     with col2:
         st.metric(label="Precio Actual", value=f"{precio_actual:.5f}")
     with col3:
@@ -214,8 +229,8 @@ if data is not None and not data.empty and len(data) > 20:
                 <div class="alert-box">
                     <p class="signal-up">🚀 ACCIÓN: ARRIBA</p>
                     <p><b>Temporalidad:</b> {temporalidad}</p>
-                    <p><b>Hora Señal (UTC-3):</b> {hora_actual_utc3}</p>
-                    <p style="font-size: 0.85rem; color: #8b949e;">Zona de sobreventa detectada.</p>
+                    <p><b>Entrada Siguiente Vela:</b> {hora_senal_siguiente}</p>
+                    <p style="font-size: 0.85rem; color: #8b949e;">Prepárate para entrar al inicio de la nueva vela.</p>
                 </div>
             """, unsafe_allow_html=True)
         elif rsi_actual > 60:
@@ -224,8 +239,8 @@ if data is not None and not data.empty and len(data) > 20:
                 <div class="alert-box-down">
                     <p class="signal-down">🔻 ACCIÓN: ABAJO</p>
                     <p><b>Temporalidad:</b> {temporalidad}</p>
-                    <p><b>Hora Señal (UTC-3):</b> {hora_actual_utc3}</p>
-                    <p style="font-size: 0.85rem; color: #8b949e;">Zona de sobrecompra detectada.</p>
+                    <p><b>Entrada Siguiente Vela:</b> {hora_senal_siguiente}</p>
+                    <p style="font-size: 0.85rem; color: #8b949e;">Prepárate para entrar al inicio de la nueva vela.</p>
                 </div>
             """, unsafe_allow_html=True)
         else:
@@ -233,25 +248,25 @@ if data is not None and not data.empty and len(data) > 20:
                 <div style="background-color: #161b22; padding: 15px; border-radius: 4px; border: 1px solid #30363d;">
                     <p style="color: #8b949e; font-weight: bold;">⚖️ MERCADO EN CONSOLIDACIÓN</p>
                     <p><b>Temporalidad:</b> {temporalidad}</p>
-                    <p><b>Última revisión (UTC-3):</b> {hora_actual_utc3}</p>
+                    <p><b>Última revisión (UTC-3):</b> {hora_actual_utc3.strftime('%H:%M:%S')}</p>
                 </div>
             """, unsafe_allow_html=True)
 
         st.markdown("---")
         
-        # Botón para registrar la señal
+        # Botón para registrar la señal apuntando a la hora de la siguiente vela
         if tipo_senal and st.button("📌 Registrar Señal en el Historial"):
             nueva_entrada = {
-                "Hora (UTC-3)": hora_actual_utc3,
+                "Hora Entrada (UTC-3)": hora_senal_siguiente,
                 "Activo": nombre_activo,
                 "Tipo": tipo_senal,
                 "Temporalidad": temporalidad,
-                "Precio_Entrada": precio_anterior,
+                "Precio_Entrada": precio_actual,
                 "Estado": "Pendiente / Evaluando"
             }
-            if not st.session_state.historial_senales or st.session_state.historial_senales[-1]["Hora (UTC-3)"] != hora_actual_utc3:
+            if not st.session_state.historial_senales or st.session_state.historial_senales[-1]["Hora Entrada (UTC-3)"] != hora_senal_siguiente:
                 st.session_state.historial_senales.append(nueva_entrada)
-                st.success("¡Señal registrada con éxito en el historial!")
+                st.success("¡Señal registrada con éxito para la siguiente vela!")
 
     # --- SECCIÓN DE HISTORIAL Y AUDITORÍA DE RESULTADOS (WIN / LOSS) ---
     st.markdown("---")
