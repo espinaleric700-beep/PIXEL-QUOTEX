@@ -323,4 +323,3 @@ if data is not None and not data.empty and len(data) > 20:
 
 else:
     st.error("Cargando datos del mercado en tiempo real...")
-    
