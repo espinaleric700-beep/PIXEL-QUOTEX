@@ -18,8 +18,8 @@ st.set_page_config(
 # Configurar Zona Horaria UTC-3
 tz_utc3 = pytz.timezone('Etc/GMT+3')
 
-# Configurar autorefresco en tiempo real cada 10 segundos
-count = st_autorefresh(interval=10000, limit=None, key="realtime_scanner")
+# Configurar autorefresco de la página cada 2 segundos para tiempo real absoluto
+count = st_autorefresh(interval=2000, limit=None, key="realtime_scanner_2s")
 
 # Estilos CSS profesionales
 st.markdown("""
@@ -121,15 +121,15 @@ correccion_pip = st.sidebar.slider("Ajuste manual de Pips", -0.0100, 0.0100, 0.0
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("### 🛠️ Estado del Sistema")
-st.sidebar.success("🟢 Modo Tiempo Real Activo (10s)")
+st.sidebar.success("🟢 Tiempo Real Activo (2s)")
 st.sidebar.info("🕒 Zona Horaria: UTC-3")
 
 # Título Principal
 st.title("⚡ Terminal de Análisis Cuántico - Quotex OTC")
-st.markdown("Escáner en **tiempo real** con hora de entrada proyectada para la **siguiente vela**, sincronización UTC-3 y auditoría WIN / LOSS.")
+st.markdown("Escáner profesional en **tiempo real (2s)** con gráfico dinámico real, sincronización UTC-3 y auditoría WIN / LOSS.")
 
-# Descarga de datos de mercado
-@st.cache_data(ttl=5)
+# Descarga de datos de mercado con TTL muy bajo (2s) para forzar actualización real
+@st.cache_data(ttl=2)
 def cargar_datos(ticker, intervalo):
     try:
         df = yf.download(ticker, period="1d", interval=intervalo, progress=False)
@@ -158,9 +158,8 @@ if data is not None and not data.empty and len(data) > 20:
     data['SMA_20'] = data['Close'].rolling(window=20).mean()
     data['SMA_50'] = data['Close'].rolling(window=50).mean()
 
-    # Precios actuales
+    # Precios actuales reales con calibración aplicada
     precio_actual = float(data['Close'].iloc[-1]) + correccion_pip
-    precio_anterior = float(data['Close'].iloc[-2]) + correccion_pip
     rsi_actual = float(data['RSI'].iloc[-1]) if not np.isnan(data['RSI'].iloc[-1]) else 50.0
     
     # Hora actual exacta en UTC-3
@@ -170,7 +169,6 @@ if data is not None and not data.empty and len(data) > 20:
     minutos_map = {"1m": 1, "5m": 5, "15m": 15, "1h": 60}
     delta_minutos = minutos_map.get(temporalidad, 1)
     
-    # Redondear hacia adelante para calcular el inicio exacto de la siguiente vela
     minuto_actual = hora_actual_utc3.minute
     siguiente_minuto = ((minuto_actual // delta_minutos) + 1) * delta_minutos
     
@@ -195,29 +193,34 @@ if data is not None and not data.empty and len(data) > 20:
 
     st.markdown("---")
 
-    # Layout de Gráfico Interactivo y Panel de Operativa
+    # Layout de Gráfico Interactivo Real y Panel de Operativa
     c_graf, c_pan = st.columns([2.5, 1])
 
     with c_graf:
-        st.subheader(f"Gráfico Técnico - {nombre_activo} ({temporalidad}) [Tiempo Real]")
+        st.subheader(f"Gráfico Técnico Real - {nombre_activo} ({temporalidad})")
         fig = go.Figure()
+        
+        # Gráfico de velas real y actualizado con los precios calibrados del usuario
         fig.add_trace(go.Candlestick(
             x=data.index,
             open=data['Open'] + correccion_pip,
             high=data['High'] + correccion_pip,
             low=data['Low'] + correccion_pip,
             close=data['Close'] + correccion_pip,
-            name='Precio'
+            name='Precio Real'
         ))
+        
+        # Medias móviles superpuestas en tiempo real
         fig.add_trace(go.Scatter(x=data.index, y=data['SMA_20'] + correccion_pip, mode='lines', name='SMA 20', line=dict(color='orange', width=1.5)))
+        fig.add_trace(go.Scatter(x=data.index, y=data['SMA_50'] + correccion_pip, mode='lines', name='SMA 50', line=dict(color='#00d2ff', width=1.5)))
         
         fig.update_layout(
             template='plotly_dark',
             xaxis_rangeslider_visible=False,
-            height=450,
+            height=460,
             margin=dict(l=10, r=10, t=10, b=10)
         )
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, use_container_width=True, key="grafico_tiempo_real")
 
     with c_pan:
         st.subheader("Panel de Operativa")
@@ -230,7 +233,7 @@ if data is not None and not data.empty and len(data) > 20:
                     <p class="signal-up">🚀 ACCIÓN: ARRIBA</p>
                     <p><b>Temporalidad:</b> {temporalidad}</p>
                     <p><b>Entrada Siguiente Vela:</b> {hora_senal_siguiente}</p>
-                    <p style="font-size: 0.85rem; color: #8b949e;">Prepárate para entrar al inicio de la nueva vela.</p>
+                    <p style="font-size: 0.85rem; color: #8b949e;">Preparado para la siguiente vela.</p>
                 </div>
             """, unsafe_allow_html=True)
         elif rsi_actual > 60:
@@ -240,7 +243,7 @@ if data is not None and not data.empty and len(data) > 20:
                     <p class="signal-down">🔻 ACCIÓN: ABAJO</p>
                     <p><b>Temporalidad:</b> {temporalidad}</p>
                     <p><b>Entrada Siguiente Vela:</b> {hora_senal_siguiente}</p>
-                    <p style="font-size: 0.85rem; color: #8b949e;">Prepárate para entrar al inicio de la nueva vela.</p>
+                    <p style="font-size: 0.85rem; color: #8b949e;">Preparado para la siguiente vela.</p>
                 </div>
             """, unsafe_allow_html=True)
         else:
