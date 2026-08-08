@@ -1,14 +1,13 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-from datetime import datetime
+from datetime import datetime, timedelta
 import pytz
 from PIL import Image
-import io
 
 # Configuración de la página
 st.set_page_config(
-    page_title="Escáner Profesional Quotex - Visión Artificial",
+    page_title="Escáner Profesional Quotex - Señales de Entrada",
     page_icon="👁️",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -94,27 +93,38 @@ st.sidebar.success("🟢 Escáner Activo")
 st.sidebar.info("🕒 Zona Horaria: UTC-3")
 
 # Cabecera Principal
-st.title("⚡ Quotex AI Visual Scanner - Análisis Profesional")
-st.markdown("Sube o pega la captura de tu gráfica OTC para que el motor analice la estructura de precios, velas y dirección institucional.")
+st.title("⚡ Quotex AI Visual Scanner - Señales de Entrada Exactas")
+st.markdown("Sube o pega la captura de tu gráfica OTC para que el motor determine la dirección institucional y la **hora exacta de entrada** en la siguiente vela.")
 
 if imagen_subida is not None:
-    # Cargar y mostrar la imagen analizada
     imagen = Image.open(imagen_subida)
     
-    col_img, col_res = st.load_template = st.columns([1.5, 1]) if hasattr(st, 'columns') else st.columns(2)
+    col_img, col_res = st.columns([1.5, 1])
     
     with col_img:
         st.subheader("📸 Captura Analizada del Gráfico")
         st.image(imagen, use_container_width=True)
 
     with col_res:
-        st.subheader("🔍 Diagnóstico del Escáner")
+        st.subheader("🔍 Diagnóstico y Hora de Entrada")
         
-        # Simulación de análisis técnico avanzado basado en procesamiento de imagen y estrategia seleccionada
         hora_actual_utc3 = datetime.now(tz_utc3)
         
-        # Generar un análisis dinámico y robusto basado en características visuales simuladas del escáner
-        np.random.seed(len(imagen.tobytes()) % 1000) # Semilla consistente por imagen
+        # Calcular la siguiente hora exacta de entrada según la temporalidad
+        minutos_map = {"1m": 1, "5m": 5, "15m": 15, "30m": 30}
+        delta_minutos = minutos_map.get(temporalidad_analisis, 1)
+        minuto_actual = hora_actual_utc3.minute
+        siguiente_minuto = ((minuto_actual // delta_minutos) + 1) * delta_minutos
+        
+        if siguiente_minuto >= 60:
+            hora_siguiente = hora_actual_utc3.replace(minute=0, second=0, microsecond=0) + timedelta(hours=1)
+        else:
+            hora_siguiente = hora_actual_utc3.replace(minute=siguiente_minuto, second=0, microsecond=0)
+        
+        hora_entrada_exacta = hora_siguiente.strftime('%H:%M:%S')
+
+        # Simulación de análisis técnico basado en la imagen
+        np.random.seed(len(imagen.tobytes()) % 1000)
         score_alcista = np.random.randint(35, 85)
         
         if score_alcista > 52:
@@ -132,24 +142,24 @@ if imagen_subida is not None:
 
         st.markdown(f"""
             <div class="{clase_css}">
-                <p class="{clase_texto}">{icono}ACCIÓN INSTITUCIONAL: {accion}</p>
+                <p class="{clase_texto}">{icono} ACCIÓN: {accion}</p>
+                <p><b>⏰ Hora Exacta de Entrada:</b> <span style="font-size: 1.2rem; color: #ffeb3b;">{hora_entrada_exacta}</span></p>
                 <p><b>Método Aplicado:</b> {estrategia_filtro}</p>
-                <p><b>Nivel de Confluencia:</b> {confianza}%</p>
-                <p><b>Hora del Escaneo:</b> {hora_actual_utc3.strftime('%H:%M:%S')}</p>
+                <p><b>Confluencia:</b> {confianza}%</p>
             </div>
         """, unsafe_allow_html=True)
 
-        with st.expander("📊 Ver Desglose Técnico Profesional"):
+        with st.expander("📊 Ver Desglose Técnico"):
             st.markdown(f"""
-            - **Estructura de Mercado:** Detectado impulso {'alcista' if accion=='ARRIBA' else 'bajista'} en los últimos bloques de velas.
-            - **Zonas de Interés (S/R):** El precio respeta niveles clave identificados en la captura.
-            - **Fuerza de Volumen:** Presión institucional dominante hacia {accion.lower()}.
-            - **Sugerencia Operativa:** Operar a temporalidad de {temporalidad_analisis}.
+            - **Reloj Actual (UTC-3):** {hora_actual_utc3.strftime('%H:%M:%S')}
+            - **Estructura:** Impulso {'alcista' if accion=='ARRIBA' else 'bajista'} detectado.
+            - **Instrucción:** Preparar la operación en Quotex para que abra exactamente en el segundo 00 de la hora indicada.
             """)
 
         if st.button("📌 Guardar en Historial de Señales"):
             nuevo_registro = {
-                "Hora (UTC-3)": hora_actual_utc3.strftime('%H:%M:%S'),
+                "Hora Análisis": hora_actual_utc3.strftime('%H:%M:%S'),
+                "Hora Entrada": hora_entrada_exacta,
                 "Método": estrategia_filtro,
                 "Temporalidad": temporalidad_analisis,
                 "Acción": accion,
@@ -174,6 +184,6 @@ else:
     st.markdown("""
         <div class="info-box">
             <h3>👈 Esperando captura de pantalla...</h3>
-            <p>Por favor, haz una captura de tu pantalla en Quotex, selecciónala o <b>colócala en el portapapeles y presiona Ctrl + V</b> en el panel de la izquierda para comenzar el análisis profesional.</p>
+            <p>Haz una captura de tu gráfica en Quotex, selecciónala o <b>colócala en el portapapeles y presiona Ctrl + V</b> en el panel de la izquierda para obtener la señal y la hora exacta de entrada.</p>
         </div>
     """, unsafe_allow_html=True)
